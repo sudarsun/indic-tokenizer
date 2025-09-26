@@ -10,12 +10,13 @@ This module implements an Indic BERT WordPiece Tokenizer using the Indic Unicode
 """
 
 from tokenizers.implementations import BertWordPieceTokenizer
-from indic_unicode_mapper import IndicUnicodeMapper
+from .indic_unicode_mapper import IndicUnicodeMapper
 import tempfile
 import os
 import multiprocessing
 import shutil
-from logger import get_logger
+from .simple_logger import get_logger
+import numpy as np
 
 # Extension of the Bert WP Tokenizer in the Indic context (Tamil for starters)
 class IndicBertWordPieceTokenizer:
@@ -24,6 +25,22 @@ class IndicBertWordPieceTokenizer:
     __sep_token = "[sep]"
     __mask_token = "[mask]"
     __pad_token = "[pad]"
+
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of the vocabulary.
+        :return: Size of the vocabulary.
+        """
+        return self._tokenizer.get_vocab_size()
+    
+    @property
+    def get_vocab(self):
+        """
+        Returns the vocabulary of the tokenizer.
+        :return: Vocabulary as a dictionary.
+        """
+        return self._tokenizer.get_vocab()
 
     @staticmethod
     def build_model(files:list[str], model_dir:str="./", vocab_size:int=30000, min_frequency:int=2, human_readable:bool=False):
@@ -113,15 +130,22 @@ class IndicBertWordPieceTokenizer:
                                                            strip_accents=False, lowercase=False,
                                                            sep_token = self.__sep_token, unk_token= self.__unk_token, 
                                                            mask_token=self.__mask_token, cls_token=self.__cls_token, pad_token=self.__pad_token)
+    @property
+    def mapper(self):
+        """
+        Returns the Indic Unicode Mapper instance used by the tokenizer.
+        :return: IndicUnicodeMapper instance.
+        """
+        return self._mapper
 
     # method to encode the indic text
-    def encode(self, text:str, lang="ta"):
+    def encode(self, text:str):
         # map the indic text to higher unicodes
-        norm_text = self._mapper.encode(text=text, lang=lang)
+        norm_text = self._mapper.encode(text=text)
         # use the base tokenizer to tokenize the mapped text
         return self._tokenizer.encode(norm_text)
     
-    def tokenize(self, text:str, lang="ta"):
+    def tokenize(self, texts:list[str]):
         """
         Tokenize the given text using the tokenizer.
         :param text: Text to tokenize.
@@ -130,7 +154,7 @@ class IndicBertWordPieceTokenizer:
         """
         # encode the text to get the token ids
         # return the tokens from the encoded object
-        return self.encode(text, lang)
+        return np.array([np.array(self.encode(text).ids) for text in texts])
 
     # method to decode the indic text
     def decode(self, ids:list[int]):
